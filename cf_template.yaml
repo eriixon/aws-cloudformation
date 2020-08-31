@@ -1,4 +1,13 @@
 AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  NameOfService:
+    Description: "The service name"
+    Type: String
+  KeyName:
+    Description: Name of existing EC2 KeyPair to enable SSH access into the server
+    Type: AWS::EC2::KeyPair::KeyName
+
 Mappings:
   RegionMap:
     us-east-1:
@@ -19,10 +28,9 @@ Resources:
       - !Ref MySecurityGroup
       Tags:
         - Key: "Name"
-          Value: !Join
-            - ""
-            - - "EC2 Instance for "
-              - !Ref AWS::Region
+          Value: !Ref NameOfService
+      KeyName: !Ref KeyName
+
     MySecurityGroup:
       Type: AWS::EC2::SecurityGroup
         Properties: 
@@ -33,3 +41,8 @@ Resources:
             ToPort: "22"
             CidrIp: 0.0.0.0/0
 
+Outputs:
+  ServerDns:
+    Value: !GetAtt
+      - Ec2Instance
+      - PublicDnsNmame
