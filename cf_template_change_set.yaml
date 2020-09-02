@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  MyKeyPair:
+    Description: Amazom EC2 Key Pair
+    Type: AWS::EC2::KeyPair::KeyName
+  VpcId:
+    Description: Enter the VpcId
+    Type: AWS::EC2::VPC::Id
+  SubnetIds:
+    Description: Enter the SubnetId
+    Type: List<AWS::EC2::Subnet::Id>
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-1853ac65
+    us-west-1:
+      AMI: ami-bf5540df
+
+Resources:
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      SecurityGroup:
+        - !Ref ALBSecurityGroup
+      Subnets: !Ref SubnetIds
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: TargetGroup
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref VpcID
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AvailabilityZones: !GetAZs
+      LaunchConfogurationName: !Ref LaunchConfiguration
+      MinSize: 1
+      MaxSize: 3
+      TargetGroupARNs:
+        - !Ref TargetGroup
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              httpd: []
+              php: []
+            files:
+            /var/www/html/index.php:
+              content: !Sub |
+                <?php print "Hello world"; ?>
+            services:
+              sysvinit:
+                httpd:
+                  enabled: true
+                  ensureRunning: true
+    Properties:
+      KeyName: !Ref MyKeyPair
+      InstanceType: t2.micro
+      SecurityGroups:
+        - !Ref EC2SecurityGroup
+      ImageId:
+        Fn::FindInMap:
+        - RegionMap
+        - !Ref AWS::Region
+        - AMI
+        UserData:
+          'Fn::Base64':
+            !Sub |
+              #!/bin/bash -xe
+              # Ensure AWS CFN Bootstrap is latest
+              yum install -y aws-cfn-bootstrap
+              # Install the files and packages from the metadata
+              /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} -- resource EC2Instance --region ${AWS::Region}
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: ABL Security Group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress: 
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: EC Instance
+  EC2InboundRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties: 
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupID:
+        !GetAtt
+        - ALBSecurityGroup
+        - GroupId
+      GroupdId:
+        !GetAtt
+        - EC2SecurityGroup
+        - GroupId
+
+Outputs:
+  Website:
+    Description: The Public DNC for the EC2 Instance
+    Value: !Sub 'http://${EC2Instance.PublicDnsName}'

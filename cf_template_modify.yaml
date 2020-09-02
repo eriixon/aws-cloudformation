@@ -7,6 +7,12 @@ Parameters:
   KeyName:
     Description: Name of existing EC2 KeyPair to enable SSH access into the server
     Type: AWS::EC2::KeyPair::KeyName
+  VpcId:
+    Description: Enter the VpcId
+    Type: AWS::EC2::VPC::Id
+  SubnetId:
+    Description: Enter the SubnetId
+    Type: AWS::EC2::Subnet::Id
 
 Mappings:
   RegionMap:
@@ -43,6 +49,7 @@ Resources:
         - AMI
       SecurityGroups:
         - !Ref MySecurityGroup
+      SubnetId: !Ref SubnetId
       Tags:
         - Key: Name
           Value: !Ref NameOfService
@@ -59,12 +66,9 @@ Resources:
     MySecurityGroup:
       Type: AWS::EC2::SecurityGroup
         Properties: 
-          GroupDescription: Open ports 22 and 80
+          GroupDescription: Open port 80 for website
+          VpcId: !Ref VpcId
           SecurityGroupIngress: 
-          - IpProtocol: tcp
-            FromPort: '22'
-            ToPort: '22'
-            CidrIp: 0.0.0.0/0
           - IpProtocol: tcp
             FromPort: '80'
             ToPort: '80'
